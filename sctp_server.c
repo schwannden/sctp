@@ -12,7 +12,7 @@ main(int argc, char **argv)
   struct sctp_event_subscribe evnts;
   int                         stream_increment=1;
   socklen_t                   len;
-  size_t                      rd_sz;
+  int                         rd_sz;
 
   //Program initialization, bind, and listen
   if (argc == 2)
@@ -29,7 +29,7 @@ main(int argc, char **argv)
   evnts.sctp_data_io_event = 1;
   Setsockopt(sock_fd, IPPROTO_SCTP, SCTP_EVENTS,
        &evnts, sizeof(evnts));
-  Listen(sock_fd, LISTEN_Q);
+  Listen(sock_fd, 10);
 
   // main program
   while (true) {
@@ -37,16 +37,23 @@ main(int argc, char **argv)
     len = sizeof(struct sockaddr_in);
     rd_sz = sctp_recvmsg (sock_fd, readbuf, sizeof (readbuf),
                           (SA*) &cliaddr, &len, &sri, &msg_flags);
-    if (stream_increment) {
-      sri.sinfo_stream++;
-      int retsz;
-      struct sctp_status status;
-      bzero (&status, sizeof(status));
-      if (sri.sinfo_stream >= 10) 
-        sri.sinfo_stream = 0;
+    if (rd_sz > 0) {
+      if (stream_increment) {
+        sri.sinfo_stream++;
+        int retsz;
+        struct sctp_status status;
+        bzero (&status, sizeof(status));
+        retsz = sizeof (status);
+        int assoc_id = sri.sinfo_assoc_id;
+        status.sstat_assoc_id = assoc_id;
+        Sctp_opt_info (sock_fd, assoc_id, SCTP_STATUS, &status, &retsz);
+        // printf ("%d    %d    %d    \n", rd_sz, assoc_id, status.sstat_outstrms);
+        if (sri.sinfo_stream >= status.sstat_outstrms)
+          sri.sinfo_stream = 0;
+      }
+      sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
+                    sri.sinfo_ppid, sri.sinfo_flags,
+                    sri.sinfo_stream, 0, 0);
     }
-    sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
-                  sri.sinfo_ppid, sri.sinfo_flags,
-                  sri.sinfo_stream, 0, 0);
   }
 }
