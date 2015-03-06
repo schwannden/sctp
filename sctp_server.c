@@ -42,9 +42,7 @@ main(int argc, char **argv)
       int retsz;
       struct sctp_status status;
       bzero (&status, sizeof(status));
-      status.sstat_assoc_id = sri.sinfo_assoc_id;
-      int maxStr = Sctp_opt_info (sock_fd, status.sstat_assoc_id, SCTP_STATUS, &status, &retsz);
-      if (sri.sinfo_stream >= maxStr) 
+      if (sri.sinfo_stream >= 10) 
         sri.sinfo_stream = 0;
     }
     sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
