@@ -2,6 +2,11 @@
 #include "nplib/np_lib.h"
 #include <netinet/sctp.h>
 
+void disableSIGINT (void);
+void SIGINT_handler (int signal);
+void enableSIGCHILD (void);
+void SIGCHILD_handler (int signal);
+
 int
 main(int argc, char **argv)
 {
@@ -13,11 +18,14 @@ main(int argc, char **argv)
   int                         stream_increment=1;
   socklen_t                   len;
   int                         rd_sz;
+  int                         close_time = 120;
 
   //Program initialization, bind, and listen
   if (argc == 2)
     stream_increment = atoi (argv[1]);
   sock_fd = Socket (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP);
+  //Terminate an association after 2 minutee
+  Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_AUTOCLOSE, &close_time, sizeof close_time);
   bzero (&servaddr, sizeof (servaddr));
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
@@ -30,6 +38,9 @@ main(int argc, char **argv)
   Setsockopt(sock_fd, IPPROTO_SCTP, SCTP_EVENTS,
        &evnts, sizeof(evnts));
   Listen(sock_fd, 10);
+
+  disableSIGINT ();
+  enableSIGCHILD ();
 
   // main program
   while (true) {
@@ -45,7 +56,6 @@ main(int argc, char **argv)
         bzero (&status, sizeof(status));
         retsz = sizeof (status);
         int assoc_id = sri.sinfo_assoc_id;
-        status.sstat_assoc_id = assoc_id;
         Sctp_opt_info (sock_fd, assoc_id, SCTP_STATUS, &status, &retsz);
         // printf ("%d    %d    %d    \n", rd_sz, assoc_id, status.sstat_outstrms);
         if (sri.sinfo_stream >= status.sstat_outstrms)
@@ -56,4 +66,52 @@ main(int argc, char **argv)
                     sri.sinfo_stream, 0, 0);
     }
   }
+}
+
+void
+disableSIGINT (void)
+{
+  struct sigaction newDisp;
+  newDisp.sa_handler = SIGINT_handler;
+  newDisp.sa_flags = 0;
+  sigemptyset (&newDisp.sa_mask);
+  Sigaction (SIGINT, &newDisp, NULL);
+  Sigaction (SIGQUIT, &newDisp, NULL);
+}
+
+void
+SIGINT_handler (int signal)
+{
+  if (signal == SIGINT)
+    {
+      printf ("  Ouch! Type Ctrl + \\ to quit.\n");
+      return;
+    }
+  else if (signal == SIGQUIT)
+    {
+      printf ("  Terminating sctp server.\n");
+      exit (EXIT_SUCCESS);
+    }
+}
+
+void
+enableSIGCHILD (void)
+{
+  struct sigaction newDisp;
+  newDisp.sa_handler = SIGCHILD_handler;
+  newDisp.sa_flags = 0;
+  sigemptyset (&newDisp.sa_mask);
+  Sigaction (SIGCHLD, &newDisp, NULL);
+}
+
+void
+SIGCHILD_handler (int signal)
+{
+  int old_errno = errno;
+  pid_t pid;
+
+  while (pid = waitpid (-1, NULL, WNOHANG))
+    printf ("child %4d terminated\n", pid);
+
+  return;
 }
