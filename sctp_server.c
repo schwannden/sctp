@@ -29,7 +29,10 @@ main(int argc, char **argv)
   Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_AUTOCLOSE, &close_time, sizeof close_time);
   bzero (&servaddr, sizeof (servaddr));
   servaddr.sin_family = AF_INET;
-  servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
+  if (argc == 2)
+    inet_pton (AF_INET, argv[1], &servaddr.sin_addr);
+  else
+    servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
   servaddr.sin_port = htons (SERV_PORT);
 
   Bind (sock_fd, (SA*) &servaddr, sizeof (servaddr));

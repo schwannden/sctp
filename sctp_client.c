@@ -65,6 +65,7 @@ sctpstr_cli (FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen)
     printf ("read %d bytes from input\n", out_sz);
     Sctp_sendmsg (sock_fd, sendline, out_sz, to, tolen, 
                   0, 0, sri.sinfo_stream, 0, 0);
+    printf ("sent %d bytes\n", out_sz);
 
     len = sizeof (peeraddr);
     rd_sz = Sctp_recvmsg (sock_fd, recvline, sizeof(recvline),
@@ -97,10 +98,10 @@ sctpstr_cli_echoall (FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen
     }
     for (i=0 ; i<SERV_MAX_SCTP_STRM ; i++) {
       snprintf (sendline + strsz, sizeof (sendline) - strsz, ".msg.%d 1", i);
-      Sctp_sendmsg (sock_fd, sendline, sizeof (sendline), 
+      Sctp_sendmsg (sock_fd, sendline, strsz, 
                     to, tolen, 0, 0, i, 0, 0);
       snprintf (sendline + strsz, sizeof (sendline) - strsz, ".msg.%d 2", i);
-      Sctp_sendmsg (sock_fd, sendline, sizeof (sendline), 
+      Sctp_sendmsg (sock_fd, sendline, strsz, 
                     to, tolen, 0, 0, i, 0, 0);
     }
     for (i=0 ; i<SERV_MAX_SCTP_STRM*2 ; i++) {
