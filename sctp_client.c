@@ -1,6 +1,5 @@
 #include "nplib/np_header.h"
 #include "nplib/np_lib.h"
-#include <netinet/sctp.h>
 
 #ifndef SERV_MAX_SCTP_STRM
 #define SERV_MAX_SCTP_STRM 10
