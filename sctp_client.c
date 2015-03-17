@@ -49,19 +49,20 @@ sctpstr_cli (FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen)
 {
   struct sockaddr_in     peeraddr;
   struct sctp_sndrcvinfo sri;
-  char                   sendline[MAXLINE], recvline[MAXLINE];
+  char                   sendline[SCTP_MAXBLOCK], recvline[SCTP_MAXBLOCK];
   socklen_t              len;
   int                    out_sz,rd_sz;
   int                    msg_flags;
 
   bzero (&sri, sizeof (sri));
-  while (fgets (sendline, MAXLINE, fp) != NULL) {
+  while (fgets (sendline, SCTP_MAXBLOCK, fp) != NULL) {
     if (sendline[0] != '[') {
       printf ("Error, line must be of the form '[streamnum]text'\n");
       continue;
     }
     sri.sinfo_stream = strtol (&sendline[1], NULL, 0);
     out_sz = strlen (sendline);
+    printf ("read %d bytes from input\n", out_sz);
     Sctp_sendmsg (sock_fd, sendline, out_sz, to, tolen, 
                   0, 0, sri.sinfo_stream, 0, 0);
 

@@ -11,7 +11,8 @@ int
 main(int argc, char **argv)
 {
   int                         sock_fd, msg_flags;
-  char                        readbuf[BUFF_SIZE];
+  //char                        readbuf[BUFF_SIZE];
+  char*                       readbuf;
   struct sockaddr_in          servaddr, cliaddr;
   struct sctp_sndrcvinfo      sri;
   struct sctp_event_subscribe evnts;
@@ -46,8 +47,12 @@ main(int argc, char **argv)
   while (true) {
     //len is initialized everytime, because sctp_recvmsg takes it as in-out parameter
     len = sizeof(struct sockaddr_in);
-    rd_sz = sctp_recvmsg (sock_fd, readbuf, sizeof (readbuf),
-                          (SA*) &cliaddr, &len, &sri, &msg_flags);
+    printf ("blocking to receive message\n");
+    //rd_sz = Sctp_recvmsg (sock_fd, readbuf, sizeof (readbuf),
+    //                      (SA*) &cliaddr, &len, &sri, &msg_flags);
+    readbuf = pdapi_recvmsg (sock_fd, &rd_sz, (SA*) &cliaddr, 
+                             &len, &sri, &msg_flags);
+    printf ("%d bytes of message received\n", rd_sz);
     if (rd_sz > 0) {
       if (stream_increment) {
         sri.sinfo_stream++;
@@ -57,11 +62,10 @@ main(int argc, char **argv)
         retsz = sizeof (status);
         int assoc_id = sri.sinfo_assoc_id;
         Sctp_opt_info (sock_fd, assoc_id, SCTP_STATUS, &status, &retsz);
-        // printf ("%d    %d    %d    \n", rd_sz, assoc_id, status.sstat_outstrms);
         if (sri.sinfo_stream >= status.sstat_outstrms)
           sri.sinfo_stream = 0;
       }
-      sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
+      Sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
                     sri.sinfo_ppid, sri.sinfo_flags,
                     sri.sinfo_stream, 0, 0);
     }
