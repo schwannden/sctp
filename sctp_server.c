@@ -1,6 +1,5 @@
-#include "nplib/np_header.h"
-#include "nplib/np_lib.h"
-#include <netinet/sctp.h>
+#include <libsnp/np_header.h>
+#include <libsnp/np_lib.h>
 
 void disableSIGINT (void);
 void SIGINT_handler (int signal);
