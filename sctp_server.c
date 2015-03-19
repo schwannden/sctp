@@ -5,16 +5,17 @@ void disableSIGINT (void);
 void SIGINT_handler (int signal);
 void enableSIGCHILD (void);
 void SIGCHILD_handler (int signal);
+void sctpSubscribeEvent (struct sctp_event_subscribe * events);
 
 int
 main(int argc, char **argv)
 {
   int                         sock_fd, msg_flags;
-  //char                        readbuf[BUFF_SIZE];
-  char*                       readbuf;
+  char                        readbuf[BUFF_SIZE];
+  //char*                       readbuf;
   struct sockaddr_in          servaddr, cliaddr;
   struct sctp_sndrcvinfo      sri;
-  struct sctp_event_subscribe evnts;
+  struct sctp_event_subscribe events;
   int                         stream_increment=1;
   socklen_t                   len;
   int                         rd_sz;
@@ -36,42 +37,52 @@ main(int argc, char **argv)
 
   Bind (sock_fd, (SA*) &servaddr, sizeof (servaddr));
   
-  bzero (&evnts, sizeof (evnts));
-  evnts.sctp_data_io_event = 1;
+  bzero (&events, sizeof (events));
+  sctpSubscribeEvent (&events);
   Setsockopt(sock_fd, IPPROTO_SCTP, SCTP_EVENTS,
-       &evnts, sizeof(evnts));
+       &events, sizeof(events));
   Listen(sock_fd, 10);
 
   disableSIGINT ();
   enableSIGCHILD ();
 
   // main program
-  while (true) {
-    //len is initialized everytime, because sctp_recvmsg takes it as in-out parameter
-    len = sizeof(struct sockaddr_in);
-    printf ("blocking to receive message\n");
-    //rd_sz = Sctp_recvmsg (sock_fd, readbuf, sizeof (readbuf),
-    //                      (SA*) &cliaddr, &len, &sri, &msg_flags);
-    readbuf = pdapi_recvmsg (sock_fd, &rd_sz, (SA*) &cliaddr, 
-                             &len, &sri, &msg_flags);
-    printf ("%d bytes of message received\n", rd_sz);
-    if (rd_sz > 0) {
-      if (stream_increment) {
-        sri.sinfo_stream++;
-        int retsz;
-        struct sctp_status status;
-        bzero (&status, sizeof(status));
-        retsz = sizeof (status);
-        int assoc_id = sri.sinfo_assoc_id;
-        Sctp_opt_info (sock_fd, assoc_id, SCTP_STATUS, &status, &retsz);
-        if (sri.sinfo_stream >= status.sstat_outstrms)
-          sri.sinfo_stream = 0;
-      }
-      Sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
-                    sri.sinfo_ppid, sri.sinfo_flags,
-                    sri.sinfo_stream, 0, 0);
+  while (true)
+    {
+      //len is initialized everytime, because sctp_recvmsg takes it as in-out parameter
+      len = sizeof(struct sockaddr_in);
+      printf ("blocking to receive message\n");
+      rd_sz = Sctp_recvmsg (sock_fd, readbuf, sizeof (readbuf),
+                            (SA*) &cliaddr, &len, &sri, &msg_flags);
+      //readbuf = pdapi_recvmsg (sock_fd, &rd_sz, (SA*) &cliaddr, 
+      //                         &len, &sri, &msg_flags);
+      if (msg_flags & MSG_NOTIFICATION)
+        {
+          print_notification (readbuf);
+        }
+      else
+        {
+          printf ("%d bytes of message received\n", rd_sz);
+          if (rd_sz > 0)
+            {
+              if (stream_increment)
+                {
+                  sri.sinfo_stream++;
+                  int retsz;
+                  struct sctp_status status;
+                  bzero (&status, sizeof(status));
+                  retsz = sizeof (status);
+                  int assoc_id = sri.sinfo_assoc_id;
+                  Sctp_opt_info (sock_fd, assoc_id, SCTP_STATUS, &status, &retsz);
+                  if (sri.sinfo_stream >= status.sstat_outstrms)
+                    sri.sinfo_stream = 0;
+                }
+              Sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
+                            sri.sinfo_ppid, sri.sinfo_flags,
+                            sri.sinfo_stream, 0, 0);
+            }
+        }
     }
-  }
 }
 
 void
@@ -120,4 +131,17 @@ SIGCHILD_handler (int signal)
     printf ("child %4d terminated\n", pid);
 
   return;
+}
+
+void
+sctpSubscribeEvent (struct sctp_event_subscribe * events)
+{
+  events->sctp_data_io_event = 1;
+  events->sctp_association_event = 0;
+  events->sctp_address_event = 0;
+  events->sctp_send_failure_event = 0;
+  events->sctp_peer_error_event = 0;
+  events->sctp_shutdown_event = 0;
+  events->sctp_partial_delivery_event = 0;
+  events->sctp_adaptation_layer_event = 0;
 }
