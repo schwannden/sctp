@@ -1,6 +1,9 @@
 # Practice SCPT
 
-Pre-requisite
+## Pre-requisite
 
-In Fedora
-sudo yum install lksctp*
+* Fedora
+sudo yum install lksctp\*
+
+* Debian/Ubuntu
+sudo apt-get install libsctp-dev lksctp-tools
