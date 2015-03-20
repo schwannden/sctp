@@ -57,7 +57,7 @@ main(int argc, char **argv)
                                &len, &sri, &msg_flags);
       if (msg_flags & MSG_NOTIFICATION)
         {
-          print_notification (readbuf);
+          print_notification (sock_fd, readbuf);
         }
       else
         {
@@ -82,6 +82,9 @@ main(int argc, char **argv)
             }
         }
     }
+
+  free (readbuf);
+  return 0;
 }
 
 void
