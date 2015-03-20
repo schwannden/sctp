@@ -11,8 +11,7 @@ int
 main(int argc, char **argv)
 {
   int                         sock_fd, msg_flags;
-  char                        readbuf[BUFF_SIZE];
-  //char*                       readbuf;
+  char*                       readbuf = malloc (SCTP_PDAPI_INCR_SIZE);
   struct sockaddr_in          servaddr, cliaddr;
   struct sctp_sndrcvinfo      sri;
   struct sctp_event_subscribe events;
@@ -26,7 +25,7 @@ main(int argc, char **argv)
     stream_increment = atoi (argv[1]);
   sock_fd = Socket (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP);
   //Terminate an association after 2 minutee
-  Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_AUTOCLOSE, &close_time, sizeof close_time);
+  Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_AUTOCLOSE, &close_time, sizeof (close_time));
   bzero (&servaddr, sizeof (servaddr));
   servaddr.sin_family = AF_INET;
   if (argc == 2)
@@ -52,10 +51,10 @@ main(int argc, char **argv)
       //len is initialized everytime, because sctp_recvmsg takes it as in-out parameter
       len = sizeof(struct sockaddr_in);
       printf ("blocking to receive message\n");
-      rd_sz = Sctp_recvmsg (sock_fd, readbuf, sizeof (readbuf),
-                            (SA*) &cliaddr, &len, &sri, &msg_flags);
-      //readbuf = pdapi_recvmsg (sock_fd, &rd_sz, (SA*) &cliaddr, 
-      //                         &len, &sri, &msg_flags);
+      //rd_sz = Sctp_recvmsg (sock_fe, readbuf, SCTP_PDAPI_INCR_SIZE,
+      //                      (SA*) &cliaddr, &len, &sri, &msg_flags);
+      readbuf = pdapi_recvmsg (sock_fd, &rd_sz, (SA*) &cliaddr, 
+                               &len, &sri, &msg_flags);
       if (msg_flags & MSG_NOTIFICATION)
         {
           print_notification (readbuf);
@@ -137,11 +136,11 @@ void
 sctpSubscribeEvent (struct sctp_event_subscribe * events)
 {
   events->sctp_data_io_event = 1;
-  events->sctp_association_event = 0;
-  events->sctp_address_event = 0;
-  events->sctp_send_failure_event = 0;
-  events->sctp_peer_error_event = 0;
-  events->sctp_shutdown_event = 0;
-  events->sctp_partial_delivery_event = 0;
-  events->sctp_adaptation_layer_event = 0;
+  events->sctp_association_event = 1;
+  events->sctp_address_event = 1;
+  events->sctp_send_failure_event = 1;
+  events->sctp_peer_error_event = 1;
+  events->sctp_shutdown_event = 1;
+  events->sctp_partial_delivery_event = 1;
+  events->sctp_adaptation_layer_event = 1;
 }
