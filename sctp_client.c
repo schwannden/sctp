@@ -5,18 +5,16 @@
 #define SERV_MAX_SCTP_STRM 10
 #endif
 
-void
-sctpstr_cli(FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen);
-
-void
-sctpstr_cli_echoall(FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen);
+void sctpstr_cli(FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen);
+void sctpstr_cli_echoall(FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen);
+void sctpSubscribeEvent (struct sctp_event_subscribe * events);
 
 int
 main(int argc, char **argv)
 {
   int                         sock_fd;
   struct sockaddr_in          servaddr;
-  struct sctp_event_subscribe evnts;
+  struct sctp_event_subscribe events;
   int                         echo_to_all=0;
 
   if (argc < 2)
@@ -32,9 +30,12 @@ main(int argc, char **argv)
   servaddr.sin_port        = htons (SERV_PORT);
   inet_pton (AF_INET, argv[1], &servaddr.sin_addr);
 
-  bzero (&evnts, sizeof (evnts));
-  evnts.sctp_data_io_event = 1;
-  Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_EVENTS, &evnts, sizeof (evnts));
+  bzero (&events, sizeof (events));
+  events.sctp_data_io_event = 1;
+  Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_EVENTS, &events, sizeof (events));
+  sctpSubscribeEvent (&events);
+  Setsockopt(sock_fd, IPPROTO_SCTP, SCTP_EVENTS,
+       &events, sizeof(events));
   if(echo_to_all == 0)
     sctpstr_cli (stdin, sock_fd, (SA*) &servaddr, sizeof (servaddr));
   else
@@ -54,27 +55,36 @@ sctpstr_cli (FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen)
   int                    msg_flags;
 
   bzero (&sri, sizeof (sri));
-  while (fgets (sendline, SCTP_MAXBLOCK, fp) != NULL) {
-    if (sendline[0] != '[') {
-      printf ("Error, line must be of the form '[streamnum]text'\n");
-      continue;
+  while (fgets (sendline, SCTP_MAXBLOCK, fp) != NULL)
+    {
+      if (sendline[0] != '[')
+        {
+          printf ("Error, line must be of the form '[streamnum]text'\n");
+          continue;
+        }
+      sri.sinfo_stream = strtol (&sendline[1], NULL, 0);
+      out_sz = strlen (sendline);
+      printf ("read %d bytes from input\n", out_sz);
+      Sctp_sendmsg (sock_fd, sendline, out_sz, to, tolen, 
+                    0, 0, sri.sinfo_stream, 0, 0);
+      printf ("sent %d bytes\n", out_sz);
+     
+      len = sizeof (peeraddr);
+      rd_sz = Sctp_recvmsg (sock_fd, recvline, sizeof(recvline),
+                           (SA*) &peeraddr, &len,
+                           &sri,&msg_flags);
+      if (msg_flags & MSG_NOTIFICATION)
+        {
+          print_notification (sock_fd, recvline);
+        }
+      else
+        {
+          printf ("From str:%d seq:%d (assoc:0x%x):",
+                  sri.sinfo_stream,sri.sinfo_ssn,
+                  (u_int)sri.sinfo_assoc_id);
+          printf ("%.*s",rd_sz,recvline);
+        }
     }
-    sri.sinfo_stream = strtol (&sendline[1], NULL, 0);
-    out_sz = strlen (sendline);
-    printf ("read %d bytes from input\n", out_sz);
-    Sctp_sendmsg (sock_fd, sendline, out_sz, to, tolen, 
-                  0, 0, sri.sinfo_stream, 0, 0);
-    printf ("sent %d bytes\n", out_sz);
-
-    len = sizeof (peeraddr);
-    rd_sz = Sctp_recvmsg (sock_fd, recvline, sizeof(recvline),
-                         (SA*) &peeraddr, &len,
-                         &sri,&msg_flags);
-    printf ("From str:%d seq:%d (assoc:0x%x):",
-            sri.sinfo_stream,sri.sinfo_ssn,
-            (u_int)sri.sinfo_assoc_id);
-    printf ("%.*s",rd_sz,recvline);
-  }
 }
 
 void
@@ -112,4 +122,17 @@ sctpstr_cli_echoall (FILE *fp, int sock_fd, struct sockaddr *to, socklen_t tolen
       printf ("%.*s\n",rd_sz,recvline);
     }
   }
+}
+
+void
+sctpSubscribeEvent (struct sctp_event_subscribe * events)
+{
+  events->sctp_data_io_event = 1;
+  events->sctp_association_event = 1;
+  events->sctp_address_event = 1;
+  events->sctp_send_failure_event = 1;
+  events->sctp_peer_error_event = 1;
+  events->sctp_shutdown_event = 1;
+  events->sctp_partial_delivery_event = 1;
+  events->sctp_adaptation_layer_event = 1;
 }
