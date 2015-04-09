@@ -13,8 +13,11 @@
 #### Second we need libsnp
 
 ``git clone https://github.com/schwannden/libsnp``
+
 ``cd libsnp``
+
 ``make``
+
 ``sudo make install``
 
 For those system whose ``LD_LIBRARY_PATH does not contain /usr/lib
