@@ -1,10 +1,13 @@
 #include <libsnp/np_header.h>
 #include <libsnp/np_lib.h>
 
+/* this function disables ctrl+C, so that process can only be killed by ctrl+\ */
 void disableSIGINT (void);
 void SIGINT_handler (int signal);
+/* this function enables SIGCHID signal, so that we can handle dead child */
 void enableSIGCHILD (void);
 void SIGCHILD_handler (int signal);
+// this function controls how many events to subscribe
 void sctpSubscribeEvent (struct sctp_event_subscribe * events);
 
 int
@@ -23,11 +26,17 @@ main(int argc, char **argv)
   //Program initialization, bind, and listen
   if (argc == 2)
     stream_increment = atoi (argv[1]);
+  // AF_INET + SOCK_SEQPACKET defines SCTP protocol in POSIX
   sock_fd = Socket (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP);
   //Terminate an association after 2 minutee
   Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_AUTOCLOSE, &close_time, sizeof (close_time));
+  //initialize serv struct sockaddr_in servaddr
   bzero (&servaddr, sizeof (servaddr));
   servaddr.sin_family = AF_INET;
+  // in unspecified by argv[1], server side sctp  address is bind 
+  // to INADDR_ANY, which is usually two addresses
+  // 1. the primary interface's IP (if it exists and is up)
+  // 2. 127.0.0.1 
   if (argc == 2)
     inet_pton (AF_INET, argv[1], &servaddr.sin_addr);
   else
@@ -36,10 +45,12 @@ main(int argc, char **argv)
 
   Bind (sock_fd, (SA*) &servaddr, sizeof (servaddr));
   
+  // Subscribe to all events before alling listen
   bzero (&events, sizeof (events));
   sctpSubscribeEvent (&events);
   Setsockopt(sock_fd, IPPROTO_SCTP, SCTP_EVENTS,
        &events, sizeof(events));
+  // All setsockopt operation should be finished by now.
   Listen(sock_fd, 10);
 
   disableSIGINT ();
@@ -51,10 +62,18 @@ main(int argc, char **argv)
       //len is initialized everytime, because sctp_recvmsg takes it as in-out parameter
       len = sizeof(struct sockaddr_in);
       printf ("blocking to receive message\n");
-      //rd_sz = Sctp_recvmsg (sock_fe, readbuf, SCTP_PDAPI_INCR_SIZE,
-      //                      (SA*) &cliaddr, &len, &sri, &msg_flags);
+      // rd_sz = Sctp_recvmsg (sock_fe, readbuf, SCTP_PDAPI_INCR_SIZE,
+      //                       (SA*) &cliaddr, &len, &sri, &msg_flags);
+      // When receiving message, filling in sri (struct sctp_sndrcvinfo)
+      // structure. This structure records all sender, receiver related
+      // informations. Including association id, stream number, 
+      // sequence number. Or in case this is an event, it contain event
+      // related information.
       readbuf = pdapi_recvmsg (sock_fd, &rd_sz, (SA*) &cliaddr, 
                                &len, &sri, &msg_flags);
+      // whenever receiving from socket, check to if it is
+      // 1. local event
+      // 2. peer data message (peer does not generate event)
       if (msg_flags & MSG_NOTIFICATION)
         {
           print_notification (sock_fd, readbuf);
@@ -66,16 +85,23 @@ main(int argc, char **argv)
             {
               if (stream_increment)
                 {
+                  // increment the stream number to reply to a different stream.
+                  // This has the benefit or avoiding head of line blocking
                   sri.sinfo_stream++;
                   int retsz;
+                  // getting the maximum available stream
                   struct sctp_status status;
                   bzero (&status, sizeof(status));
                   retsz = sizeof (status);
                   int assoc_id = sri.sinfo_assoc_id;
+                  // Get status of a sctp socket
                   Sctp_opt_info (sock_fd, assoc_id, SCTP_STATUS, &status, &retsz);
+                  // if the incremented stream exceeds system limit, sending message back on
+                  // stream 0
                   if (sri.sinfo_stream >= status.sstat_outstrms)
                     sri.sinfo_stream = 0;
                 }
+              // sending the message back
               Sctp_sendmsg (sock_fd, readbuf, rd_sz, (SA*) &cliaddr, len,
                             sri.sinfo_ppid, sri.sinfo_flags,
                             sri.sinfo_stream, 0, 0);

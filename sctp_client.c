@@ -5,7 +5,9 @@
 #define SERV_MAX_SCTP_STRM 10
 #endif
 
+// simple echo reply
 void sctpstr_cli(int in_fd, int sock_fd, struct sockaddr *to, socklen_t tolen);
+// echo reply to all streams
 void sctpstr_cli_echoall(int in_fd, int sock_fd, struct sockaddr *to, socklen_t tolen);
 void sctpSubscribeEvent (struct sctp_event_subscribe * events);
 
@@ -23,6 +25,7 @@ main(int argc, char **argv)
     printf ("Echoing messages to all streams\n");
     echo_to_all = 1;
   }
+  // AF_INET + SOCK_SEQPACKET defines SCTP protocol in POSIX
   sock_fd = Socket (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP);
   bzero (&servaddr, sizeof (servaddr));
   servaddr.sin_family      = AF_INET;
