@@ -14,7 +14,7 @@ int
 main(int argc, char **argv)
 {
   int                         sock_fd, msg_flags;
-  char*                       readbuf = malloc (SCTP_PDAPI_INCR_SIZE);
+  char*                       readbuf;
   struct sockaddr_in          servaddr, cliaddr;
   struct sctp_sndrcvinfo      sri;
   struct sctp_event_subscribe events;
@@ -22,6 +22,9 @@ main(int argc, char **argv)
   socklen_t                   len;
   int                         rd_sz;
   int                         close_time = 120;
+  union sctp_notification*    sn;
+  struct sctp_paddr_change*   spc;
+  int                         interval = 10;
 
   //Program initialization, bind, and listen
   if (argc == 2)
@@ -77,6 +80,15 @@ main(int argc, char **argv)
       if (msg_flags & MSG_NOTIFICATION)
         {
           print_notification (sock_fd, readbuf);
+          if (((union sctp_notification*) readbuf)->sn_header.sn_type == SCTP_PEER_ADDR_CHANGE)
+            {
+              spc = &((union sctp_notification*) readbuf)->sn_paddr_change;
+              if (spc->spc_state == SCTP_ADDR_CONFIRMED )
+                {
+                  heartbeat_action (sock_fd, (SA*)&spc->spc_aaddr, sizeof(spc->spc_aaddr), interval);
+                  printf ("heart beat is set for %d\n", interval);
+                }
+            }
         }
       else
         {
