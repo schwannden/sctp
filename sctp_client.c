@@ -65,7 +65,6 @@ sctpstr_cli (int in_fd, int sock_fd, struct sockaddr *to, socklen_t tolen)
       if (eof == 0)
         FD_SET( in_fd, &rset );
       FD_SET( sock_fd, &rset );
-      max_fd = max (in_fd, sock_fd) + 1;
       //blocking for either user or socket inputs
       Select( max_fd, &rset, NULL, NULL, NULL);
 
@@ -83,19 +82,15 @@ sctpstr_cli (int in_fd, int sock_fd, struct sockaddr *to, socklen_t tolen)
             }
           sri.sinfo_stream = strtol (&sendline[1], NULL, 0);
           out_sz = strlen (sendline);
-          printf ("read %d bytes from input\n", out_sz);
           Sctp_sendmsg (sock_fd, sendline, out_sz, to, tolen, 
                         0, 0, sri.sinfo_stream, 0, 0);
-          printf ("sent %d bytes\n", out_sz);
         }
       if( FD_ISSET(sock_fd, &rset) )
         {
           len = sizeof (peeraddr);
-          printf ("Read from Sctp_recvmsg\n");
           rd_sz = Sctp_recvmsg (sock_fd, recvline, sizeof(recvline),
                                (SA*) &peeraddr, &len,
                                &sri,&msg_flags);
-          printf ("Sctp_recv returns %d\n", rd_sz);
           if (msg_flags & MSG_NOTIFICATION)
             {
               print_notification (sock_fd, recvline);
@@ -118,39 +113,66 @@ sctpstr_cli_echoall (int in_fd, int sock_fd, struct sockaddr *to, socklen_t tole
 {
   struct sockaddr_in     peeraddr;
   struct sctp_sndrcvinfo sri;
-  char                   sendline[SCTP_MAXLINE], recvline[SCTP_MAXLINE];
+  char                   sendline[SCTP_MAXBLOCK], recvline[SCTP_MAXBLOCK];
   socklen_t              len;
-  int                    rd_sz, i, strsz;
-  int                    msg_flags;
+  int                    out_sz, rd_sz, i, strsz, msg_flags, max_fd, eof = 0;
+  fd_set                 rset;
 
+  FD_ZERO (&rset);
   bzero (sendline, sizeof (sendline));
   bzero (&sri, sizeof (sri));
+  max_fd = max (in_fd, sock_fd) + 1;
   while (1)
     {
-      Readline (in_fd, sendline, SCTP_MAXLINE - 9);
-      strsz = strlen (sendline);
-      if (sendline[strsz-1] == '\n')
+      if (eof == 0)
+        FD_SET( in_fd, &rset );
+      FD_SET( sock_fd, &rset );
+      //blocking for either user or socket inputs
+      Select( max_fd, &rset, NULL, NULL, NULL);
+
+      if( FD_ISSET(in_fd, &rset) )
         {
-          sendline[strsz-1] = '\0';
-          strsz--;
+          if ( Readline (in_fd, sendline, SCTP_MAXLINE - 9) == 0 )
+            {
+              eof = 1;
+              FD_CLR (in_fd, &rset);
+            }
+          else
+            {
+              strsz = strlen (sendline);
+              if (sendline[strsz-1] == '\n')
+                {
+                  sendline[strsz-1] = '\0';
+                  strsz--;
+                }
+              for (i=0 ; i<SERV_MAX_SCTP_STRM ; i++)
+                {
+                  snprintf (sendline + strsz, sizeof (sendline) - strsz, ".msg.%d 1", i);
+                  Sctp_sendmsg (sock_fd, sendline, strsz, 
+                                to, tolen, 0, 0, i, 0, 0);
+                  snprintf (sendline + strsz, sizeof (sendline) - strsz, ".msg.%d 2", i);
+                  Sctp_sendmsg (sock_fd, sendline, strsz, 
+                                to, tolen, 0, 0, i, 0, 0);
+                }
+            }
         }
-      for (i=0 ; i<SERV_MAX_SCTP_STRM ; i++)
-        {
-          snprintf (sendline + strsz, sizeof (sendline) - strsz, ".msg.%d 1", i);
-          Sctp_sendmsg (sock_fd, sendline, strsz, 
-                        to, tolen, 0, 0, i, 0, 0);
-          snprintf (sendline + strsz, sizeof (sendline) - strsz, ".msg.%d 2", i);
-          Sctp_sendmsg (sock_fd, sendline, strsz, 
-                        to, tolen, 0, 0, i, 0, 0);
-        }
-      for (i=0 ; i<SERV_MAX_SCTP_STRM*2 ; i++)
+      if( FD_ISSET(sock_fd, &rset) )
         {
           len = sizeof(peeraddr);
           rd_sz = Sctp_recvmsg (sock_fd, recvline, sizeof(recvline),
                                 (SA*) &peeraddr, &len, &sri,&msg_flags);
-          printf ("From str:%d seq:%d (assoc:0x%x):", sri.sinfo_stream,
-                   sri.sinfo_ssn, (u_int) sri.sinfo_assoc_id);
-          printf ("%.*s\n",rd_sz,recvline);
+          if (msg_flags & MSG_NOTIFICATION)
+            {
+              print_notification (sock_fd, recvline);
+              if (((union sctp_notification*) recvline)->sn_header.sn_type == SCTP_SHUTDOWN_EVENT)
+                return;
+            }
+          else
+            {
+              printf ("From str:%d seq:%d (assoc:0x%x):", sri.sinfo_stream,
+                       sri.sinfo_ssn, (u_int) sri.sinfo_assoc_id);
+              printf ("%.*s\n",rd_sz,recvline);
+            }
         }
     }
 }
