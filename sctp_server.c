@@ -24,7 +24,10 @@ main(int argc, char **argv)
   int                         close_time = 120;
   union sctp_notification*    sn;
   struct sctp_paddr_change*   spc;
+  // Set heartbeat interval in ms
   int                         interval = 10;
+  // set interval to SCTP_NO_HB (0) to disable heartbeat
+  // set interval to SCTP_ISSUE_HB (0xffffffff) to request immediate heartbeat
 
   //Program initialization, bind, and listen
   if (argc == 2)
