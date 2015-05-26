@@ -1,5 +1,6 @@
 #include <libsnp/np_header.h>
 #include <libsnp/np_lib.h>
+#include <libsnp/log.h>
 
 #ifndef SERV_MAX_SCTP_STRM
 #define SERV_MAX_SCTP_STRM 10
@@ -70,10 +71,13 @@ sctpstr_cli (int in_fd, int sock_fd, struct sockaddr *to, socklen_t tolen)
 
       if( FD_ISSET(in_fd, &rset) )
         {
+          log_debug ("in_fd ready");
           if ( Readline (in_fd, sendline, SCTP_MAXBLOCK) == 0 )
             {
+              log_debug ("end of user input...");
               eof = 1;
               FD_CLR (in_fd, &rset);
+              continue;
             }
           if (sendline[0] != '[')
             {

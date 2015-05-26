@@ -1,5 +1,6 @@
 #include <libsnp/np_header.h>
 #include <libsnp/np_lib.h>
+#include <libsnp/log.h>
 
 /* this function disables ctrl+C, so that process can only be killed by ctrl+\ */
 void disableSIGINT (void);
@@ -30,26 +31,33 @@ main(int argc, char **argv)
   // set interval to SCTP_ISSUE_HB (0xffffffff) to request immediate heartbeat
 
   //Program initialization, bind, and listen
-  if (argc == 2)
-    stream_increment = atoi (argv[1]);
   // AF_INET + SOCK_SEQPACKET defines SCTP protocol in POSIX
   sock_fd = Socket (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP);
+  if (argc < 2)
+    {
+      bzero (&servaddr, sizeof (servaddr));
+      servaddr.sin_family = AF_INET;
+      // in unspecified by argv[1], server side sctp  address is bind 
+      // to INADDR_ANY, which is usually two addresses
+      // 1. the primary interface's IP (if it exists and is up)
+      // 2. 127.0.0.1 
+      // initialize serv struct sockaddr_in servaddr
+      servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
+      servaddr.sin_port = htons (SERV_PORT);
+      Bind (sock_fd, (SA*) &servaddr, sizeof (servaddr));
+    }
+  else
+    {
+      //bind address set
+      if (sctp_bind_arg_list (sock_fd, argv + 1, argc - 1))
+        {
+          log_error ("can't bind address set");
+          exit (-1);
+        }
+    }
+
   //Terminate an association after 2 minutee
   Setsockopt (sock_fd, IPPROTO_SCTP, SCTP_AUTOCLOSE, &close_time, sizeof (close_time));
-  //initialize serv struct sockaddr_in servaddr
-  bzero (&servaddr, sizeof (servaddr));
-  servaddr.sin_family = AF_INET;
-  // in unspecified by argv[1], server side sctp  address is bind 
-  // to INADDR_ANY, which is usually two addresses
-  // 1. the primary interface's IP (if it exists and is up)
-  // 2. 127.0.0.1 
-  if (argc == 2)
-    inet_pton (AF_INET, argv[1], &servaddr.sin_addr);
-  else
-    servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
-  servaddr.sin_port = htons (SERV_PORT);
-
-  Bind (sock_fd, (SA*) &servaddr, sizeof (servaddr));
   
   // Subscribe to all events before alling listen
   bzero (&events, sizeof (events));
@@ -67,7 +75,7 @@ main(int argc, char **argv)
     {
       //len is initialized everytime, because sctp_recvmsg takes it as in-out parameter
       len = sizeof(struct sockaddr_in);
-      printf ("blocking to receive message\n");
+      log_debug ("blocking to receive message");
       // rd_sz = Sctp_recvmsg (sock_fe, readbuf, SCTP_PDAPI_INCR_SIZE,
       //                       (SA*) &cliaddr, &len, &sri, &msg_flags);
       // When receiving message, filling in sri (struct sctp_sndrcvinfo)
@@ -89,13 +97,13 @@ main(int argc, char **argv)
               if (spc->spc_state == SCTP_ADDR_CONFIRMED )
                 {
                   heartbeat_action (sock_fd, (SA*)&spc->spc_aaddr, sizeof(spc->spc_aaddr), interval);
-                  printf ("heart beat is set for %d\n", interval);
+                  log_info ("heart beat is set for %d", interval);
                 }
             }
         }
       else
         {
-          printf ("%d bytes of message received\n", rd_sz);
+          log_debug ("%d bytes of message received", rd_sz);
           if (rd_sz > 0)
             {
               if (stream_increment)
@@ -149,7 +157,8 @@ SIGINT_handler (int signal)
     }
   else if (signal == SIGQUIT)
     {
-      printf ("  Terminating sctp server.\n");
+      printf ("\n");
+      log_info ("Terminating sctp server.");
       exit (EXIT_SUCCESS);
     }
 }
@@ -171,7 +180,7 @@ SIGCHILD_handler (int signal)
   pid_t pid;
 
   while (pid = waitpid (-1, NULL, WNOHANG))
-    printf ("child %4d terminated\n", pid);
+    log_debug ("child %4d terminated\n", pid);
 
   return;
 }
