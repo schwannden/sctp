@@ -1,6 +1,7 @@
 #include <libsnp/np_header.h>
 #include <libsnp/np_lib.h>
 #include <libsnp/log.h>
+#include "common.h"
 
 /* this function disables ctrl+C, so that process can only be killed by ctrl+\ */
 void disableSIGINT (void);

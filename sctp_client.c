@@ -1,6 +1,7 @@
 #include <libsnp/np_header.h>
 #include <libsnp/np_lib.h>
 #include <libsnp/log.h>
+#include "common.h"
 
 #ifndef SERV_MAX_SCTP_STRM
 #define SERV_MAX_SCTP_STRM 10
