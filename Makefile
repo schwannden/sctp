@@ -1,4 +1,4 @@
-CFLAGS=-g -L/usr/lib/ -Wl,-rpath=/usr/lib 
+CFLAGS=-g -L/usr/lib/ -Wl,-rpath=/usr/local/lib 
 CLIBS=-lsctp -lsnp 
 ifeq ($(LOG_LEVEL),)
   CFLAGS += -D LOG_LEVEL=3
