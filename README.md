@@ -68,16 +68,19 @@ Sending message to all streams
 A testing mesage file called ``msg`` conntaining message begin with ``BEGIN ###`` and end with ``### END`` can be used as follows
 
 First start the server
-![testing server](execServer.png)
+![testing server](exeServer.png)
 
 Test client by
-![testing client](execClient.png)
+![testing client](exeClient.png)
+What ``./client server_address all`` does is it sends the message to all streams **twice**.
 
 On the client side, you should see
 ![client echo](clientEcho.png)
+Notice if the client and server are far away, the stream numbers might not be in-order. But the sequence number in each stream should be in strict order. The SCTP_PEER_ADDR_CHANGE notification should only be shown once, as the face receives message, sctp protocol confirms the validity of the face.
 
 On the server side, you should see
 ![server reply](serverReply.png)
+server sends out a heartbeat for no reason. I inserted the code just so you know how to use heartbeat.
 
 Shut down client by ctrl+\, and on the server side, you should see
 ![server shutdown](serverShutdown.png)
