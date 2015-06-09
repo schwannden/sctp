@@ -63,3 +63,21 @@ Sending messahe to specified stream
 Sending message to all streams
 
 ``./client server_address all``
+
+#### Testing
+A testing mesage file called ``msg`` conntaining message begin with ``BEGIN ###`` and end with ``### END`` can be used as follows
+
+First start the server
+![testing server](execServer.png)
+
+Test client by
+![testing client](execClient.png)
+
+On the client side, you should see
+![client echo](clientEcho.png)
+
+On the server side, you should see
+![server reply](serverReply.png)
+
+Shut down client by ctrl+\, and on the server side, you should see
+![server shutdown](serverShutdown.png)
